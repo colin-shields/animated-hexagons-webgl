@@ -39,36 +39,52 @@ function main() {
         return;
     }
 
-    let a = new Hexagon(0.0, 0.0,
-        0.5, 1.0, 0,
-        [1.0, 0.5, 0.75, 1.0]);
+    let hexagons = [
+        new Hexagon(-0.5, 0.25,
+            0.25, 1.0, 0,
+            [1.0, 0.5, 0.75, 1.0]),
 
-    // let a = new Hexagon(-0.5, 0.5,
-    //     0.25, 1.0, 0,
-    //     [1.0, 0.5, 0.75, 1.0]);
-    //
-    // let b = new Hexagon(0.5, 0.5,
-    //     0.25, 0.5, 45,
-    //     [1.0, 0.1, 0.75, 1.0]);
-    //
-    // let c = new Hexagon(0.0, -0.5,
-    //     0.25, 0.75, 10,
-    //     [0.25, 1.5, 0.75, 1.0]);
+        new Hexagon(0.5, 0.5,
+            0.25, 0.5, 45,
+            [1.0, 0.1, 0.75, 1.0]),
 
-    // let combinedData = [...a.getDataTriangles(), ...b.getDataTriangles(), ...c.getDataTriangles()];
-    // const n = initVertexBuffers(gl, combinedData);
+        new Hexagon(0.0, -0.5,
+            0.25, 0.75, 10,
+            [0.25, 1.5, 0.75, 1.0])
+    ]
 
-    const n = initVertexBuffers(gl, a.getDataTriangles())
-    if (n < 0) {
-        console.log('Failed to set the positions of the vertices');
-        return;
+    const update = function(delta) {
+        hexagons.forEach((hex) => {
+            hex.update(delta);
+            hex.rotation += 1;    // temporary update to test animation
+        });
+    }
+
+    let n;
+    const render = function() {
+        let dataGL = [];
+        for (const hex of hexagons) {
+            dataGL.push(...hex.getDataTriangles());
+        }
+        n = initVertexBuffers(gl, dataGL);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLES, 0, n);
+    }
+
+    let prevTime = performance.now();
+    const tick = function(curTime) {
+        const delta = (curTime - prevTime) / 1000;
+        prevTime = curTime;
+
+        update(delta);
+        render();
+
+        requestAnimationFrame(tick);
     }
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.drawArrays(gl.TRIANGLES, 0, n);
-
+    tick();
 }
 
 
