@@ -45,8 +45,7 @@ function main() {
         0.25, 0.75, 10,
         [0.25, 1.5, 0.75, 1.0]);
 
-    let combinedData = [...a.getData(), ...b.getData(), ...c.getData()];
-    console.log(combinedData);
+    let combinedData = [...a.getDataTriangles(), ...b.getDataTriangles(), ...c.getDataTriangles()];
 
     const n = initVertexBuffers(gl, combinedData);
     if (n < 0) {
@@ -54,11 +53,10 @@ function main() {
         return;
     }
 
-
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.drawArrays(gl.POINTS, 0, n * 3);
+    gl.drawArrays(gl.TRIANGLES, 0, n);
 
 }
 
@@ -97,6 +95,28 @@ class Hexagon {
     }
 
     /**
+     * Return GL data as triangle vertices.
+     *
+     * Each triangle consists of three vertices, each with a color.
+     * Data is returned as:
+     * [x, y, r, g, b, a,
+     *  x, y, r, g, b, a,
+     *  ...]
+     */
+    getDataTriangles() {
+        let vertices = this.getVertices();
+        let data = [];
+        for (let i = 0; i < 4; i++) {
+            let j = 2 * i + 2;
+            // Push vertices as triangles.
+            data.push(vertices[0], vertices[1], ...this.color)
+            data.push(vertices[j], vertices[j + 1], ...this.color)
+            data.push(vertices[j + 2], vertices[j + 3], ...this.color)
+        }
+        return data;
+    }
+
+    /**
      * Return GL data as [x1, y1, r, g, b, a, x2, y2, r, g, b, a, ...]
      */
     getData() {
@@ -112,9 +132,8 @@ class Hexagon {
 
 
 function initVertexBuffers(gl, data) {
-    const n = 6;
-
     const dataGL = new Float32Array(data);
+    const VERT_LEN = 6;
 
     const vertexColorBuffer = gl.createBuffer();
     if (!vertexColorBuffer) {
@@ -133,7 +152,7 @@ function initVertexBuffers(gl, data) {
         return -1;
     }
 
-    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * 6, 0);
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * VERT_LEN, 0);
     gl.enableVertexAttribArray(a_Position);
 
     const a_Color = gl.getAttribLocation(gl.program, 'a_Color');
@@ -142,8 +161,8 @@ function initVertexBuffers(gl, data) {
         return -1;
     }
 
-    gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, FSIZE * 6, FSIZE * 2);
+    gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, FSIZE * VERT_LEN, FSIZE * 2);
     gl.enableVertexAttribArray(a_Color);
 
-    return n;
+    return dataGL.length / VERT_LEN;
 }
