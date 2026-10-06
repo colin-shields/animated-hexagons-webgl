@@ -1,17 +1,21 @@
+
 // Vertex shader program
 const VSHADER_SOURCE =
     'attribute vec4 a_Position;\n' +
+    'attribute vec4 a_Color;\n' +
+    'varying vec4 v_Color;\n' +
     'void main() {\n' +
     '  gl_Position = a_Position;\n' +
     '  gl_PointSize = 10.0;\n' +
+    '  v_Color = a_Color;\n' +
     '}\n';
 
 // Fragment shader program
 const FSHADER_SOURCE =
     'precision mediump float;\n' +
-    'uniform vec4 u_FragColor;\n' +
+    'varying vec4 v_Color;\n' +
     'void main() {\n' +
-    '  gl_FragColor = u_FragColor;\n' +
+    '  gl_FragColor = v_Color;\n' +
     '}\n';
 
 
@@ -29,13 +33,22 @@ function main() {
         return;
     }
 
-    let a = new Hexagon(0.0, 0.0,
-        0.5, 1.0, 0,
+    let a = new Hexagon(-0.5, 0.5,
+        0.25, 1.0, 0,
         [1.0, 0.5, 0.75, 1.0]);
 
-    console.log(a.getVertices());
+    let b = new Hexagon(0.5, 0.5,
+        0.25, 0.5, 45,
+        [1.0, 0.1, 0.75, 1.0]);
 
-    const n = initVertexBuffers(gl, a.getVertices(), a.color)
+    let c = new Hexagon(0.0, -0.5,
+        0.25, 0.75, 10,
+        [0.25, 1.5, 0.75, 1.0]);
+
+    let combinedData = [...a.getData(), ...b.getData(), ...c.getData()];
+    console.log(combinedData);
+
+    const n = initVertexBuffers(gl, combinedData);
     if (n < 0) {
         console.log('Failed to set the positions of the vertices');
         return;
@@ -45,7 +58,7 @@ function main() {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    gl.drawArrays(gl.TRIANGLE_FAN, 0, n);
+    gl.drawArrays(gl.POINTS, 0, n * 3);
 
 }
 
@@ -68,6 +81,9 @@ class Hexagon {
         this.color = color;
     }
 
+    /**
+     * Calculate & return the vertices as [x1, y1, x2, y2, ...]
+     */
     getVertices() {
         let vertices = [];
         for (let i = this.rotation; i < 360 + this.rotation; i += 60) {
@@ -79,27 +95,37 @@ class Hexagon {
         }
         return vertices;
     }
+
+    /**
+     * Return GL data as [x1, y1, r, g, b, a, x2, y2, r, g, b, a, ...]
+     */
+    getData() {
+        let vertices = this.getVertices();
+        let data = [];
+        for (let i = 0; i < vertices.length; i += 2) {
+            data.push(vertices[i], vertices[i + 1]);
+            data.push(...this.color);
+        }
+        return data;
+    }
 }
 
 
-function initVertexBuffers(gl, vertices, color) {
-    const n = vertices.length / 2;
+function initVertexBuffers(gl, data) {
+    const n = 6;
 
-    const vertexBuffer = gl.createBuffer();
-    if (!vertexBuffer) {
-        console.log('Failed to create the buffer object');
+    const dataGL = new Float32Array(data);
+
+    const vertexColorBuffer = gl.createBuffer();
+    if (!vertexColorBuffer) {
+        console.log('Failed to create the color buffer object');
         return -1;
     }
 
-    const u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
-    if (!u_FragColor) {
-        console.log('Failed to get the storage location of u_FragColor');
-        return;
-    }
-    gl.uniform4f(u_FragColor, ...color);
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, dataGL, gl.STATIC_DRAW);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    const FSIZE = dataGL.BYTES_PER_ELEMENT;
 
     const a_Position = gl.getAttribLocation(gl.program, 'a_Position');
     if (a_Position < 0) {
@@ -107,8 +133,17 @@ function initVertexBuffers(gl, vertices, color) {
         return -1;
     }
 
-    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * 6, 0);
     gl.enableVertexAttribArray(a_Position);
+
+    const a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+    if (a_Color < 0) {
+        console.log('Failed to get the storage location of a_Color');
+        return -1;
+    }
+
+    gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, FSIZE * 6, FSIZE * 2);
+    gl.enableVertexAttribArray(a_Color);
 
     return n;
 }
