@@ -18,6 +18,12 @@ const FSHADER_SOURCE =
     '  gl_FragColor = v_Color;\n' +
     '}\n';
 
+// Hexagon states.
+const DEAD = 0;
+const SPAWNING = 1;
+const ALIVE = 2;
+const DYING = 3;
+
 
 function main() {
     const canvas = document.getElementById('webgl');
@@ -33,21 +39,26 @@ function main() {
         return;
     }
 
-    let a = new Hexagon(-0.5, 0.5,
-        0.25, 1.0, 0,
+    let a = new Hexagon(0.0, 0.0,
+        0.5, 1.0, 0,
         [1.0, 0.5, 0.75, 1.0]);
 
-    let b = new Hexagon(0.5, 0.5,
-        0.25, 0.5, 45,
-        [1.0, 0.1, 0.75, 1.0]);
+    // let a = new Hexagon(-0.5, 0.5,
+    //     0.25, 1.0, 0,
+    //     [1.0, 0.5, 0.75, 1.0]);
+    //
+    // let b = new Hexagon(0.5, 0.5,
+    //     0.25, 0.5, 45,
+    //     [1.0, 0.1, 0.75, 1.0]);
+    //
+    // let c = new Hexagon(0.0, -0.5,
+    //     0.25, 0.75, 10,
+    //     [0.25, 1.5, 0.75, 1.0]);
 
-    let c = new Hexagon(0.0, -0.5,
-        0.25, 0.75, 10,
-        [0.25, 1.5, 0.75, 1.0]);
+    // let combinedData = [...a.getDataTriangles(), ...b.getDataTriangles(), ...c.getDataTriangles()];
+    // const n = initVertexBuffers(gl, combinedData);
 
-    let combinedData = [...a.getDataTriangles(), ...b.getDataTriangles(), ...c.getDataTriangles()];
-
-    const n = initVertexBuffers(gl, combinedData);
+    const n = initVertexBuffers(gl, a.getDataTriangles())
     if (n < 0) {
         console.log('Failed to set the positions of the vertices');
         return;
@@ -60,23 +71,30 @@ function main() {
 
 }
 
+
 class Hexagon {
     /**
      * A regular hexagon.
      * @param x             X Position of center.
      * @param y             Y Position of center.
      * @param radius        Distance from radius to each vertex.
-     * @param sizeFactor    Scales the original hexagon.
+     * @param scale         Scale applied to the radius.
      * @param rotation      Counter-clockwise angle in degrees.
      * @param color         RGBA color.
+     * @param startAlive    If true, hexagon is initially in "ALIVE" state. Else, initially in "DEAD" state.
      */
-    constructor(x, y, radius, sizeFactor, rotation, color) {
+    constructor(x, y, radius, scale, rotation, color,
+                startAlive=true) {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.sizeFactor = sizeFactor;
+        this.scale = scale;
         this.rotation = rotation;
         this.color = color;
+
+        this.timer = 0;
+        this.duration = 1.0;    // Animation duration in seconds
+        this.state = startAlive ? ALIVE : DEAD;
     }
 
     /**
@@ -86,8 +104,8 @@ class Hexagon {
         let vertices = [];
         for (let i = this.rotation; i < 360 + this.rotation; i += 60) {
             let angle = i * Math.PI / 180.0;
-            let vertX = this.x + this.radius * Math.cos(angle) * this.sizeFactor;
-            let vertY = this.y + this.radius * Math.sin(angle) * this.sizeFactor;
+            let vertX = this.x + this.radius * Math.cos(angle) * this.scale;
+            let vertY = this.y + this.radius * Math.sin(angle) * this.scale;
             vertices.push(vertX);
             vertices.push(vertY);
         }
@@ -127,6 +145,44 @@ class Hexagon {
             data.push(...this.color);
         }
         return data;
+    }
+
+    kill() {
+        this.state = DYING;
+        this.timer = 0;
+    }
+
+    spawn() {
+        this.state = SPAWNING;
+        this.timer = 0;
+    }
+
+    update(dt) {
+        if (this.state === DEAD || this.state === ALIVE) {return;}
+
+        if (this.state === DYING) {
+            const t = Math.min(this.timer / this.duration, 1.0);
+
+            this.scale = 1 - t;
+
+            if (t >= 1) {
+                this.state = DEAD;
+                this.timer = 0;
+                this.scale = 0;
+            }
+        }
+
+        if (this.state === SPAWNING) {
+            const t = Math.min(this.timer / this.duration, 1.0);
+
+            this.scale = t;
+
+            if (t >= 1) {
+                this.state = ALIVE;
+                this.timer = 0;
+                this.scale = 1;
+            }
+        }
     }
 }
 
