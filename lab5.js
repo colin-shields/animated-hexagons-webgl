@@ -32,6 +32,7 @@ const DYING = 3;
 // Chance to kill or spawn a rectangle on a given frame.
 const ACTION_CHANCE = .0015;
 
+// Length of each vertex in dataGL.
 const VERT_LEN = 6;
 
 
@@ -51,6 +52,10 @@ function main() {
         console.log('Failed to intialize shaders.');
         return;
     }
+
+    // Enable alpha channel blending (for light rays).
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     const vertexColorBuffer = gl.createBuffer();
     if (!vertexColorBuffer) {
@@ -108,10 +113,23 @@ function main() {
         curX += dx;
     }
 
+    // INITIALIZE LIGHT RAYS ///////////////////////////////////////////////////////////////////////////////////////////
+
+    let rays = [
+        new LightRay(-1.1, 1.1, 1.75, 0.5, 45),
+        new LightRay(-1.1, 1.1, 2.0, 0.5, 30, undefined, undefined, -1),
+        new LightRay(-1.1, 1.1, 1.5, 0.75, 60),
+
+        new LightRay(1.1, 1.1, 1.75, 0.5, 135, [0, 1, 1], [90, 180]),
+        new LightRay(1.1, 1.1, 1.0, 0.25, 120, [0, 1, 1], [90, 180], -1),
+        new LightRay(1.1, 1.1, 1.25, 0.75, 150, [0, 1, 1], [90, 180]),
+    ];
+
     // ANIMATION ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
     const update = function(delta) {
         hexagons.forEach((hex) => {hex.update(delta);});
+        rays.forEach((ray) => {ray.update(delta);});
     }
 
     let n;
@@ -122,7 +140,10 @@ function main() {
             if (hex.state !== DEAD)
                 dataGL.push(...hex.getDataTriangles());
         }
-        n = initVertexBuffers(gl, a_Position, a_Color, dataGL);
+        for (const ray of rays) {
+            dataGL.push(...ray.getDataTriangles());
+        }
+        n = updateVertexBuffers(gl, a_Position, a_Color, dataGL);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, n);
     }
@@ -145,7 +166,7 @@ function main() {
 }
 
 
-// HEXAGON /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// SHAPES //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class Hexagon {
     /**
@@ -283,7 +304,85 @@ class Hexagon {
 }
 
 
-function initVertexBuffers(gl, a_Position, a_Color, data) {
+class LightRay {
+    /**
+     * A ray of light.
+     * @param x             X position of rotation axis.
+     * @param y             Y position of rotation axis.
+     * @param length        Length of ray from rotation axis.
+     * @param width         Width of ray at its tail, perpendicular to the length.
+     * @param initAngle     Initial angle of ray.
+     * @param color         Color of ray as [r, g, b]. Note that alpha will be assigned automatically.
+     * @param angleBounds   Angle boundaries as [lower, upper]. If not within range, the movement will switch directions.
+     * @param initDirection Initial direction of ray. Direction will be switched at random.
+     * @param initSpeed     Initial speed of ray. Speed will be increased or decreased at random.
+     */
+    constructor(x, y, length, width, initAngle=45.0, color=[1, 1, 0],
+                angleBounds=[0, 90], initDirection=1, initSpeed=2) {
+        this.x = x;
+        this.y = y;
+        this.length = length;
+        this.width = width;
+        this.angle = initAngle;
+        this.color = color;
+        this.angleBounds = angleBounds;
+        this.direction = initDirection;
+        this.speed = initSpeed;
+    }
+
+    getDataTriangles() {
+        let angleRad = this.angle * Math.PI / 180.0;
+        let cosB = Math.cos(angleRad);
+        let sinB = Math.sin(angleRad);
+        let l = this.length;
+        let hw = this.width / 2;
+
+        return [
+            this.x, this.y, ...this.color, 0.5,
+            this.x + l * cosB + hw * sinB, this.y - l * sinB + hw * cosB, 0, 0, 0, 0.0,
+            this.x + l * cosB - hw * sinB, this.y - l * sinB - hw * cosB, 0, 0, 0, 0.0,
+        ];
+    }
+
+    update(delta) {
+        if (Math.random() < ACTION_CHANCE) {
+            this.direction *= -1;
+        }
+
+        // Randomly increase or decrease speed.
+        if (Math.random() < .5) {
+            this.speed += .05;
+        } else {
+            this.speed -= .05;
+        }
+
+        // Don't go too fast or too slow.
+        if (this.speed > 5) {
+            this.speed -= .2;
+        } else if (this.speed < 0.5) {
+            this.speed += .2;
+        }
+
+        this.speed = Math.abs(this.speed);  // keep speed positive so multiplying by direction works correctly
+
+        // Don't go out of bounds.
+        if (this.angle < this.angleBounds[0]) {
+            this.direction = 1;
+        } else if (this.angle > this.angleBounds[1]) {
+            this.direction = -1;
+        }
+
+        if (delta > 0) {
+            // For some reason, delta was occasionally NaN.
+            this.angle += this.direction * delta * this.speed;
+        }
+    }
+}
+
+
+// VERTEX BUFFERS //////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function updateVertexBuffers(gl, a_Position, a_Color, data) {
     const dataGL = new Float32Array(data);
     const FSIZE = dataGL.BYTES_PER_ELEMENT;
 
