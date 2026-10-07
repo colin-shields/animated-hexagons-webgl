@@ -1,4 +1,6 @@
 
+// SHADERS /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Vertex shader program
 const VSHADER_SOURCE =
     'attribute vec4 a_Position;\n' +
@@ -18,14 +20,23 @@ const FSHADER_SOURCE =
     '  gl_FragColor = v_Color;\n' +
     '}\n';
 
+
+// CONSTANTS ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Hexagon states.
 const DEAD = 0;
 const SPAWNING = 1;
 const ALIVE = 2;
 const DYING = 3;
 
+// Chance to kill or spawn a rectangle on a given frame.
+const ACTION_CHANCE = .0015;
+
 
 function main() {
+
+    // WEBGL SETUP /////////////////////////////////////////////////////////////////////////////////////////////////////
+
     const canvas = document.getElementById('webgl');
 
     const gl = getWebGLContext(canvas);
@@ -38,6 +49,8 @@ function main() {
         console.log('Failed to intialize shaders.');
         return;
     }
+
+    // INITIALIZE HEXAGON GRID /////////////////////////////////////////////////////////////////////////////////////////
 
     const RADIUS = 0.1  // Radius of each hexagon
 
@@ -63,7 +76,7 @@ function main() {
             hexagons.push(new Hexagon(
                 glX, glY,
                 RADIUS * .9, // Draw a border around each hex.
-                1.0, 0, color,
+                0, color,
                 Math.random() < .75 // Initially spawn hex with 75% chance.
             ))
 
@@ -73,15 +86,10 @@ function main() {
         curX += dx;
     }
 
+    // ANIMATION ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
     const update = function(delta) {
-        hexagons.forEach((hex) => {
-            hex.update(delta);
-            // temporary animation test.
-            if (hex.scale > 0) {
-                hex.scale -= .02;
-                hex.rotation += 10;
-            }
-        });
+        hexagons.forEach((hex) => {hex.update(delta);});
     }
 
     let n;
@@ -113,28 +121,27 @@ function main() {
 }
 
 
+// HEXAGON /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 class Hexagon {
     /**
      * A regular hexagon.
      * @param x             X Position of center.
      * @param y             Y Position of center.
      * @param radius        Distance from radius to each vertex.
-     * @param scale         Scale applied to the radius.
      * @param rotation      Counter-clockwise angle in degrees.
      * @param color         RGBA color.
      * @param startAlive    If true, hexagon is initially in "ALIVE" state. Else, initially in "DEAD" state.
      */
-    constructor(x, y, radius, scale, rotation, color,
+    constructor(x, y, radius, rotation, color,
                 startAlive=true) {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.scale = scale;
-        this.rotation = rotation;
         this.color = color;
 
-        this.timer = 0;
-        this.duration = 1.0;    // Animation duration in seconds
+        this.rotation = rotation;
+        this.scale = startAlive ? 1 : 0;
         this.state = startAlive ? ALIVE : DEAD;
     }
 
@@ -188,41 +195,65 @@ class Hexagon {
         return data;
     }
 
+    /**
+     * Start killing an alive hexagon.
+     */
     kill() {
         this.state = DYING;
-        this.timer = 0;
+        this.scale = 1;
     }
 
+    /**
+     * Start (re)spawning a dead hexagon.
+     * Also generates a new color.
+     */
     spawn() {
         this.state = SPAWNING;
-        this.timer = 0;
+        this.scale = 0;
+        this.color = [Math.random(), Math.random(), Math.random(), 1.0];
     }
 
-    update(dt) {
-        if (this.state === DEAD || this.state === ALIVE) {return;}
+    /**
+     * Update hexagon.
+     */
+    update(delta) {
+        if (this.state === DEAD) {
+            if (Math.random() < ACTION_CHANCE) {
+                this.spawn();
+            }
+        }
 
-        if (this.state === DYING) {
-            const t = Math.min(this.timer / this.duration, 1.0);
+        else if (this.state === ALIVE) {
+            if (Math.random() < ACTION_CHANCE) {
+                this.kill();
+            }
+        }
 
-            this.scale = 1 - t;
+        else if (this.state === DYING) {
+            this.scale -= 1.5 * delta;
+            this.rotation += 500 * delta;
 
-            if (t >= 1) {
+            if (this.scale <= 0) {
                 this.state = DEAD;
-                this.timer = 0;
                 this.scale = 0;
             }
         }
 
-        if (this.state === SPAWNING) {
-            const t = Math.min(this.timer / this.duration, 1.0);
+        else if (this.state === SPAWNING) {
+            this.scale += 1.5 * delta;
+            this.rotation -= 500 * delta;
 
-            this.scale = t;
-
-            if (t >= 1) {
+            if (this.scale >= 1) {
                 this.state = ALIVE;
-                this.timer = 0;
                 this.scale = 1;
+                this.rotation = 0;
             }
+        }
+
+        else {
+            // Impossible state.
+            console.log("¡¿inconcebible?!");
+            this.kill();
         }
     }
 }
