@@ -39,24 +39,48 @@ function main() {
         return;
     }
 
-    let hexagons = [
-        new Hexagon(-0.5, 0.25,
-            0.25, 1.0, 0,
-            [1.0, 0.5, 0.75, 1.0]),
+    const RADIUS = 0.1  // Radius of each hexagon
 
-        new Hexagon(0.5, 0.5,
-            0.25, 0.5, 45,
-            [1.0, 0.1, 0.75, 1.0]),
+    const sin60 = Math.sin(Math.PI / 3);
+    const cos60 = Math.cos(Math.PI / 3);
+    const dx = RADIUS * (1 + cos60);    // X-distance bw each hex
+    const dy = 2 * RADIUS * sin60;      // Y-distance bw each hex
 
-        new Hexagon(0.0, -0.5,
-            0.25, 0.75, 10,
-            [0.25, 1.5, 0.75, 1.0])
-    ]
+    let hexagons = [];
+
+    let curX = -1;
+    let yAdj = false;
+
+    while (curX <= 1 + RADIUS) {
+
+        let curY = 1;
+
+        while (curY > -1 - RADIUS) {
+            let glX = curX;
+            let glY = curY - (yAdj ? dy/2 : 0);
+            let color = [Math.random(), Math.random(), Math.random(), 1];
+
+            hexagons.push(new Hexagon(
+                glX, glY,
+                RADIUS * .9, // Draw a border around each hex.
+                1.0, 0, color,
+                Math.random() < .75 // Initially spawn hex with 75% chance.
+            ))
+
+            curY -= dy;
+        }
+        yAdj = !yAdj;
+        curX += dx;
+    }
 
     const update = function(delta) {
         hexagons.forEach((hex) => {
             hex.update(delta);
-            hex.rotation += 1;    // temporary update to test animation
+            // temporary animation test.
+            if (hex.scale > 0) {
+                hex.scale -= .02;
+                hex.rotation += 10;
+            }
         });
     }
 
@@ -64,7 +88,8 @@ function main() {
     const render = function() {
         let dataGL = [];
         for (const hex of hexagons) {
-            dataGL.push(...hex.getDataTriangles());
+            if (hex.state !== DEAD)
+                dataGL.push(...hex.getDataTriangles());
         }
         n = initVertexBuffers(gl, dataGL);
         gl.clear(gl.COLOR_BUFFER_BIT);
