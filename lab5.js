@@ -32,6 +32,8 @@ const DYING = 3;
 // Chance to kill or spawn a rectangle on a given frame.
 const ACTION_CHANCE = .0015;
 
+const VERT_LEN = 6;
+
 
 function main() {
 
@@ -50,6 +52,25 @@ function main() {
         return;
     }
 
+    const vertexColorBuffer = gl.createBuffer();
+    if (!vertexColorBuffer) {
+        console.log('Failed to create the color buffer object');
+        return -1;
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
+
+    const a_Position = gl.getAttribLocation(gl.program, 'a_Position');
+    if (a_Position < 0) {
+        console.log('Failed to get the storage location of a_Position');
+        return -1;
+    }
+
+    const a_Color = gl.getAttribLocation(gl.program, 'a_Color');
+    if (a_Color < 0) {
+        console.log('Failed to get the storage location of a_Color');
+        return -1;
+    }
+
     // INITIALIZE HEXAGON GRID /////////////////////////////////////////////////////////////////////////////////////////
 
     const RADIUS = 0.1  // Radius of each hexagon
@@ -61,17 +82,18 @@ function main() {
 
     let hexagons = [];
 
-    let curX = -1;
+    let curX = -1, curY;
     let yAdj = false;
+    let glX, glY, color;
 
     while (curX <= 1 + RADIUS) {
 
-        let curY = 1;
+        curY = 1;
 
         while (curY > -1 - RADIUS) {
-            let glX = curX;
-            let glY = curY - (yAdj ? dy/2 : 0);
-            let color = [Math.random(), Math.random(), Math.random(), 1];
+            glX = curX;
+            glY = curY - (yAdj ? dy/2 : 0);     // Offset every other row to neatly pack the grid
+            color = [Math.random(), Math.random(), Math.random(), 1];
 
             hexagons.push(new Hexagon(
                 glX, glY,
@@ -93,20 +115,22 @@ function main() {
     }
 
     let n;
+    let dataGL;
     const render = function() {
-        let dataGL = [];
+        dataGL = [];
         for (const hex of hexagons) {
             if (hex.state !== DEAD)
                 dataGL.push(...hex.getDataTriangles());
         }
-        n = initVertexBuffers(gl, dataGL);
+        n = initVertexBuffers(gl, a_Position, a_Color, dataGL);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, n);
     }
 
     let prevTime = performance.now();
+    let delta;
     const tick = function(curTime) {
-        const delta = (curTime - prevTime) / 1000;
+        delta = (curTime - prevTime) / 1000;
         prevTime = curTime;
 
         update(delta);
@@ -259,38 +283,21 @@ class Hexagon {
 }
 
 
-function initVertexBuffers(gl, data) {
+function initVertexBuffers(gl, a_Position, a_Color, data) {
     const dataGL = new Float32Array(data);
-    const VERT_LEN = 6;
-
-    const vertexColorBuffer = gl.createBuffer();
-    if (!vertexColorBuffer) {
-        console.log('Failed to create the color buffer object');
-        return -1;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, vertexColorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, dataGL, gl.STATIC_DRAW);
-
     const FSIZE = dataGL.BYTES_PER_ELEMENT;
 
-    const a_Position = gl.getAttribLocation(gl.program, 'a_Position');
-    if (a_Position < 0) {
-        console.log('Failed to get the storage location of a_Position');
-        return -1;
-    }
+    // Write vertex data to buffer.
+    gl.bufferData(gl.ARRAY_BUFFER, dataGL, gl.STATIC_DRAW);
 
+    // Vertex positions.
     gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, FSIZE * VERT_LEN, 0);
     gl.enableVertexAttribArray(a_Position);
 
-    const a_Color = gl.getAttribLocation(gl.program, 'a_Color');
-    if (a_Color < 0) {
-        console.log('Failed to get the storage location of a_Color');
-        return -1;
-    }
-
+    // Vertex colors.
     gl.vertexAttribPointer(a_Color, 4, gl.FLOAT, false, FSIZE * VERT_LEN, FSIZE * 2);
     gl.enableVertexAttribArray(a_Color);
 
+    // Return number of vertices to draw.
     return dataGL.length / VERT_LEN;
 }
