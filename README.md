@@ -1,6 +1,10 @@
 # Overview
 
-This project was created for CMPSC 457 - [] at Penn State Abington for the Fall 2026 semester. Below is the proposal and description of the project.
+This project was created for CMPSC 457 - Computer Graphics Algorithms at Penn State Abington for the Fall 2026 semester. Below is the proposal and description of the project.
+
+## Example
+
+![](assets/example.png)
 
 ## Running
 
@@ -22,6 +26,7 @@ Additionally, there will be animated light rays extending from the top corners o
 
 
 ![](assets/Lab%205%20Proposa%20-%20full%20gridl.png)
+
 Figure 1. A complete hexagonal grid. Each hexagon shown is in its Alive state. Light rays can be seen extending from the top-left corner of the grid. 
 
 <br>
